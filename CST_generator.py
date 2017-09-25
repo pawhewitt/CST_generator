@@ -68,9 +68,9 @@ def Compute_Coeffs(Coords,Order,n1,n2):
 
 	# Evalulate the CST function for each surface at the given x locations
 	CST_Upper=CST(U_Coords,Au,n1,n2)
-	#CST_Lower=CST(L_Coords,Al,n1,n2)
+	CST_Lower=CST(L_Coords,Al,n1,n2)
 
-	return Au,Al,CST_Upper#,CST_Lower # See how to group this together 
+	return Au,Al,CST_Upper,CST_Lower#,CST_Lower # See how to group this together 
 
 def Bi_Coeff(A): 
 	#compute the binomial coefficient
@@ -102,13 +102,25 @@ def Total_Shape(Coords,A):
 	# 	for j in range(len(A)):
 	# 		S[i]+=A[j]*S_c[j][i]
 
-	for j in range(len(A)):
-		S+=np.dot(A,S_c[j]) # Does this make sense?
 
+
+	# for j in range(len(A)):
+	# 	S+=np.dot(A,S_c[j]) # Does this make sense?
+
+	
+	#for i in range(len(A)):
+	#	S=sum(A[]*S_c[i])
+	S_c=np.transpose(S_c)
+	for  i in range(len(Coords)):
+		S[i]+=np.dot(A,S_c[i])
+
+	print np.shape(A)
+	print np.shape(S_c)
 	# for i in range(len(Coords)):
 	# 	x.append(Coords[i][0])
 	# Plot(x,S)
-
+	# plt.plot(S)
+	# plt.show()
 	return S
 
 def Comp_Shape(Coords,A):
@@ -121,19 +133,24 @@ def Comp_Shape(Coords,A):
 		for j in range(len(Coords)): # point loop
 			S_c[i][j]=(K[i]*Coords[j][0]**i)*(1-Coords[j][0])**(len(A)-i)
 	
-	for i in range(len(Coords)):
-		x.append(Coords[i][0])
-	Plot(x,S_c[0])
+	# for i in range(len(Coords)):
+	# 	x.append(Coords[i][0])
+	# Plot(x,S_c[0])
 	return S_c
 
 def CST(Coords,A,n1,n2): 
+	CST_vals=np.zeros(len(Coords))
 	# Compute Class Function
 	C=C_n1n2(Coords,n1,n2)
 
 	# Compute the Shape Function
 	S=Total_Shape(Coords,A)
 	# evaluate the CST function
-	CST_vals=np.dot(C,S)
+	for i in range(len(Coords)):
+		CST_vals[i]=C[i]*S[i]
+
+	plt.plot(CST_vals)
+	plt.show()
 
 	return CST_vals
 
