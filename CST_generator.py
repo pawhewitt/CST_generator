@@ -6,76 +6,111 @@ import SU2 # import all the python scripts in /usr/local/SU2_RUN/SU2_PY/SU2
 import numpy as np
 from math import factorial as fac
 import matplotlib.pyplot as plt
+from scipy.optimize import fmin_slsqp
 
 def main():
 
 	parser=OptionParser()
-	parser.add_option("-f",dest="Filename",default="mesh_NACA0012_inv.su2")
-	parser.add_option("-o",dest="Order",default="3")
+	parser.add_option("-f",dest="Config",default="inv_NACA0012.cfg")
 	parser.add_option("--n1",dest="n1",default="0.5")
 	parser.add_option("--n2",dest="n2",default="1.0")
 	(options, args)=parser.parse_args()
 	
-	Order=int(options.Order)
-	Filename=options.Filename
+	Config=options.Config
 	n1=float(options.n1)
 	n2=float(options.n2)
+	# Read Config 
+	Config_Data=Read_Config(Config)
+	# Order determined by the number of design variables supplied
+	Order=int(0.5*len(Config_Data['DEFINITION_DV']['PARAM'])-1)
 	# read coordinates
-	Coords=Read(options.Filename) # mesh/DAT filename
+	U_Coords,L_Coords=Read_Mesh(Config_Data) # mesh/DAT filename
 
 	# compute the coefficients
-	Au,Al,CST_Upper=Compute_Coeffs(Coords,Order,n1,n2)
+	Au,Al=Compute_Coeffs(U_Coords,L_Coords,Order,n1,n2)
 
-	# # write output
-	# Write_File() 
+	# # Update Config File
+
+	Update_Config(Config,Config_Data,Au,Al) 
 
 	# # plot the points showing how the foils differ and by how much
-	#Plot(CST_Upper)
+
+	Plot(U_Coords,L_Coords,Au,Al,n1,n2)
+	
+
+	# TODO
+	# Why are the x components different in the CST and 
+	# the original foil?
 
 	# # re-mesh geometry
+	# TODO
+	# Need to have CST added to C++ code for this
+
 	# Re_Mesh()
 
-def Read(Filename):
+def Update_Config(Config,Config_Data,Au,Al):
+#	print Config_Data['DEFINITION_DV']['PARAM'][0][0]
+	j=0
+	k=0
+	for i in range(len(Au)*2):
+		if Config_Data['DEFINITION_DV']['PARAM'][i][0]==0:
+			Config_Data['DEFINITION_DV']['PARAM'][i][1]=Au[j]
+			j+=1
+		else:
+			Config_Data['DEFINITION_DV']['PARAM'][i][1]=Al[k]
+			k+=1
+	SU2.io.config.write_config(Config,Config_Data)
+	return
+
+def Read_Config(Config):
+	Config_Data=SU2.io.config.read_config(Config)
+	return Config_Data
+
+def Read_Mesh(Config_Data):
 	# check the type of file extension
 	# if it's a SU2 config file then look for the mesh file listed in it
 	# then read and store the surface points from this mesh file
 	# If it's a dat file read and store the points.
-	# Store these points in an array called Coords[][] make this Public is possible
+	# Split theses coordinates according their surface and store as U_Coords and L_Coords
+
+	# Mesh Filename
+	Mesh=Config_Data['MESH_FILENAME']
+	marker=Config_Data['DEFINITION_DV']['MARKER'][0][0]
 
 	# Using the Su2 python scripts for reading mesh
-	Meshdata=SU2.mesh.tools.read(Filename) # read the mesh
-	
+	Meshdata=SU2.mesh.tools.read(Mesh) # read the mesh
+
 	# sort airfoil coords to be arrange clockwise from trailing edge
-	Points,Loop=SU2.mesh.tools.sort_airfoil(Meshdata,'airfoil')
+	Points,Loop=SU2.mesh.tools.sort_airfoil(Meshdata,marker)
 	
 	# get the points for the surface marker
-	Foil_Points,Foil_Nodes=SU2.mesh.tools.get_markerPoints(Meshdata,'airfoil')
-	
-	# Get the sorted points 
-	Coords=np.zeros([200,2])
+	Foil_Points,Foil_Nodes=SU2.mesh.tools.get_markerPoints(Meshdata,marker)
+
+	#Get the sorted points 
+	Coords=np.zeros([len(Points),2])
 	for i in range(len(Points)):
-		Coords[i][0]=Foil_Points[Points[i]][0]
-		Coords[i][1]=Foil_Points[Points[i]][1]
-	return Coords
-
-def Compute_Coeffs(Coords,Order,n1,n2):
-	# initial coefficents set for upper (u) and lower (l) surfaces
-	Au=np.ones(Order+1) # one more than the order
-	Al=np.ones(Order+1)*-1 
-
-	# Split Coords into Upper and Lower surfaces
+		Coords[i][0]=Foil_Points[Loop[i]][0]
+		Coords[i][1]=Foil_Points[Loop[i]][1]
+	# Divide coords for surfaces
 	U_Coords,L_Coords=Split(Coords)
 
-	# Evalulate the CST function for each surface at the given x locations
-	CST_Upper=CST(U_Coords,Au,n1,n2)
-	CST_Lower=CST(L_Coords,Al,n1,n2)
+	return U_Coords,L_Coords
 
-	return Au,Al,CST_Upper,CST_Lower#,CST_Lower # See how to group this together 
+def Compute_Coeffs(U_Coords,L_Coords,Order,n1,n2):
+	# initial coefficents set for upper (u) and lower (l) surfaces
+	Au=np.ones(Order+1)# one more than the order
+	Al=np.ones(Order+1)*-1 
+	
+	# Upper
+	Au=fmin_slsqp(Get_L2,Au,args=(U_Coords,n1,n2),iprint=0)
+	# Lower
+	Al=fmin_slsqp(Get_L2,Al,args=(L_Coords,n1,n2),iprint=0)
 
-def Bi_Coeff(A): 
+	return Au,Al #,CST_Lower # See how to group this together 
+
+def Bi_Coeff(Order): 
 	#compute the binomial coefficient
-	K=np.zeros(len(A))
-	Order=len(K)-1
+	K=np.zeros(Order+1)
 	for i in range(len(K)):
 		K[i]=fac(Order)/(fac(i)*(fac(Order-i)))
 	return K
@@ -89,57 +124,34 @@ def C_n1n2(Coords,n1,n2):
 	return C
 
 def Total_Shape(Coords,A): 
+	# Order of the bernstein polynomial 
+	Order=len(A)-1
 	# Total shape function
 	S=np.zeros(len(Coords))
 	# Component Shape Function
-	S_c=Comp_Shape(Coords,A)
-	x=[]
-	# for i in range(len(A)): # order loop 
-	# 	for j in range(len(Coords)): # point loop
-	#  		S[j]=S[j]+A[i]*S_c[i][j]
+	S_c=Comp_Shape(Coords,Order)
 
-	# for i in range(len(Coords)): # point loop
-	# 	for j in range(len(A)):
-	# 		S[i]+=A[j]*S_c[j][i]
-
-
-
-	# for j in range(len(A)):
-	# 	S+=np.dot(A,S_c[j]) # Does this make sense?
-
-	
-	#for i in range(len(A)):
-	#	S=sum(A[]*S_c[i])
 	S_c=np.transpose(S_c)
 	for  i in range(len(Coords)):
 		S[i]+=np.dot(A,S_c[i])
 
-	print np.shape(A)
-	print np.shape(S_c)
-	# for i in range(len(Coords)):
-	# 	x.append(Coords[i][0])
-	# Plot(x,S)
-	# plt.plot(S)
-	# plt.show()
 	return S
 
-def Comp_Shape(Coords,A):
+def Comp_Shape(Coords,Order):
 	# Component Shape function
-	K=Bi_Coeff(A)
+	K=Bi_Coeff(Order)
 	x=[]
 	# compute the Binomial Coefficient
-	S_c=np.zeros([len(A),len(Coords)])
-	for i in range(len(A)): # order loop
+	S_c=np.zeros([Order+1,len(Coords)])
+
+	for i in range(Order+1): # order loop
 		for j in range(len(Coords)): # point loop
-			S_c[i][j]=(K[i]*Coords[j][0]**i)*(1-Coords[j][0])**(len(A)-i)
+			S_c[i][j]=(K[i]*(Coords[j][0]**i))*((1-Coords[j][0])**(Order-i))
 	
-	# for i in range(len(Coords)):
-	# 	x.append(Coords[i][0])
-	# Plot(x,S_c[0])
 	return S_c
 
 def CST(Coords,A,n1,n2): 
-	CST_vals=np.zeros(len(Coords))
+	CST_Coords=np.zeros([len(Coords),2])
 	# Compute Class Function
 	C=C_n1n2(Coords,n1,n2)
 
@@ -147,29 +159,28 @@ def CST(Coords,A,n1,n2):
 	S=Total_Shape(Coords,A)
 	# evaluate the CST function
 	for i in range(len(Coords)):
-		CST_vals[i]=C[i]*S[i]
+		CST_Coords[i][1]=C[i]*S[i]
+		CST_Coords[i][0]=Coords[i][0]
 
-	plt.plot(CST_vals)
-	plt.show()
+	return CST_Coords
 
-	return CST_vals
+def Get_L2(A,Coords,n1,n2): 
 
-def L2(): 
+	CST_Coords=CST(Coords,A,n1,n2)
+
 	# Calculate the current L2 norm 
-	return
-
-def Opt_L2(): 
-	# Optimise the coeffient values to minimise the L2 norm value.
-	return
+	L2=np.linalg.norm(CST_Coords - Coords,ord=2)
+	return L2
 
 def Split(Coords):
-		# Spilt the surfaces according to the z component of there normal
-		# TODO split based on normal
-		# Might have to added 0,0 point to lower surface
+		# Spilt the surfaces according to the z component of the normal
+
 	U_Coords=[]
 	L_Coords=[]
+	Normals=Get_Normal(Coords)
+
 	for i in range(len(Coords)):
-		if Coords[i][1]<0:
+		if Normals[i][1]<0:
 			L_Coords.append(Coords[i])
 		else:
 			U_Coords.append(Coords[i])
@@ -180,6 +191,40 @@ def Split(Coords):
 
 	return U_Coords,L_Coords
 
+def Get_Normal(Coords):
+	# Compute the normals
+
+	# TODO 
+	# Clean this up
+
+	Normals=np.zeros([len(Coords),2])
+	for i in range(len(Coords)):
+		if i==0:
+			dx_1=Coords[i][0]-Coords[len(Coords)-1][0]
+			dy_1=Coords[i][1]-Coords[len(Coords)-1][1]
+			dx_2=Coords[i+1][0]-Coords[i][0]
+			dy_2=Coords[i+1][1]-Coords[i][1]
+		
+		elif i==len(Coords)-1:
+			dx_1=Coords[i][0]-Coords[i-1][0]
+			dy_1=Coords[i][1]-Coords[i-1][1]
+			dx_2=Coords[0][0]-Coords[i][0]
+			dy_2=Coords[0][1]-Coords[i][1]
+
+		else:
+			dx_1=Coords[i][0]-Coords[i-1][0]
+			dy_1=Coords[i][1]-Coords[i-1][1]
+			dx_2=Coords[i+1][0]-Coords[i][0]
+			dy_2=Coords[i+1][1]-Coords[i][1]
+	
+		norm_1=-dy_1,dx_1
+		norm_2=-dy_2,dx_2
+
+		Normals[i][0]=0.5*(norm_1[0]+norm_2[0])
+		Normals[i][1]=0.5*(norm_1[1]+norm_2[1])
+
+	return Normals
+
 def Write_File(): 
 	# Write a file containing the coefficients 
 	return
@@ -189,9 +234,37 @@ def Re_Mesh(): # Mesh the geometry according to the CST approximation.
 	# gmesh generator 
 	return 
 
-def Plot(x,y):
-	plt.plot(x,y)
-	plt.show()
+def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
+
+	u_coords=np.transpose(U_Coords)
+	l_coords=np.transpose(L_Coords)
+	
+	CST_Upper=CST(U_Coords,Al,n1,n2)
+	CST_Lower=CST(L_Coords,Au,n1,n2)
+
+	cst_upper=np.transpose(CST_Upper)
+	cst_lower=np.transpose(CST_Lower)
+
+	fig=plt.figure()
+	ax=fig.add_subplot(1,1,1)
+
+	
+	plt.plot(cst_upper[0],cst_upper[1],'o',label='CST',color='blue',markersize=5)
+	plt.plot(cst_lower[0],cst_lower[1],'o',color='blue',markersize=5)
+	
+
+	plt.plot(u_coords[0],u_coords[1],label='Baseline',color='green')
+	plt.plot(l_coords[0],l_coords[1],color='green')
+
+	plt.grid()
+	ax.legend(loc='best')
+	ax.set_xlabel('x/c')
+	ax.set_ylabel('z/c')
+	plt.title('Baseline and CST Fitted Foil')
+	
+	filename='./Fitting_Plot.png'
+	plt.savefig(filename,dpi=150)
+	plt.close()
 
 	return
 # this is only accessed if running from command prompt
