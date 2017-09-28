@@ -40,7 +40,7 @@ def main():
 
 	# TODO
 	# Why are the x components different in the CST and 
-	# the original foil?
+	# the original foil for the RAE?
 
 	# # re-mesh geometry
 	# TODO
@@ -67,11 +67,6 @@ def Read_Config(Config):
 	return Config_Data
 
 def Read_Mesh(Config_Data):
-	# check the type of file extension
-	# if it's a SU2 config file then look for the mesh file listed in it
-	# then read and store the surface points from this mesh file
-	# If it's a dat file read and store the points.
-	# Split theses coordinates according their surface and store as U_Coords and L_Coords
 
 	# Mesh Filename
 	Mesh=Config_Data['MESH_FILENAME']
@@ -260,9 +255,9 @@ def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
 	ax.legend(loc='best')
 	ax.set_xlabel('x/c')
 	ax.set_ylabel('z/c')
-	plt.title('Baseline and CST Fitted Foil')
+	plt.title('Curve Fitting')
 	
-	filename='./Fitting_Plot.png'
+	filename='./Foils_Plot.png'
 	plt.savefig(filename,dpi=150)
 	plt.close()
 
