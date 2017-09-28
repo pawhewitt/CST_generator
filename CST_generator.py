@@ -54,10 +54,12 @@ def Update_Config(Config,Config_Data,Au,Al):
 	k=0
 	for i in range(len(Au)*2):
 		if Config_Data['DEFINITION_DV']['PARAM'][i][0]==0:
-			Config_Data['DEFINITION_DV']['PARAM'][i][1]=Au[j]
+			Config_Data['DEFINITION_DV']['PARAM'][i][3]=Au[j]
+			Config_Data['DEFINITION_DV']['KIND'][i]="CST"
 			j+=1
 		else:
-			Config_Data['DEFINITION_DV']['PARAM'][i][1]=Al[k]
+			Config_Data['DEFINITION_DV']['PARAM'][i][3]=Al[k]
+			Config_Data['DEFINITION_DV']['KIND'][i]="CST"
 			k+=1
 	SU2.io.config.write_config(Config,Config_Data)
 	return
