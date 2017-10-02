@@ -11,27 +11,29 @@ from scipy.optimize import fmin_slsqp
 def main():
 
 	parser=OptionParser()
-	parser.add_option("-f",dest="Config",default="inv_NACA0012.cfg")
+	parser.add_option("-f",dest="filename",default="inv_NACA0012.cfg")
 	parser.add_option("--n1",dest="n1",default="0.5")
 	parser.add_option("--n2",dest="n2",default="1.0")
 	(options, args)=parser.parse_args()
 	
-	Config=options.Config
+	filename=options.filename
 	n1=float(options.n1)
 	n2=float(options.n2)
 	# Read Config 
-	Config_Data=Read_Config(Config)
+	Config=Read_Config(filename)
 	# Order determined by the number of design variables supplied
-	Order=int(0.5*len(Config_Data['DEFINITION_DV']['PARAM'])-1)
+	Order=int(0.5*len(Config['DEFINITION_DV']['PARAM'])-1)
 	# read coordinates
-	U_Coords,L_Coords=Read_Mesh(Config_Data) # mesh/DAT filename
+	U_Coords,L_Coords=Read_Mesh(Config) # mesh/DAT filename
 
 	# compute the coefficients
 	Au,Al=Compute_Coeffs(U_Coords,L_Coords,Order,n1,n2)
 
+	dvs=np.zeros(len(Au)+len(Al))
+
 	# # Update Config File
 
-	Update_Config(Config,Config_Data,Au,Al) 
+	Update_Config(filename,Config,Au,Al,dvs) 
 
 	# # plot the points showing how the foils differ and by how much
 
@@ -48,31 +50,35 @@ def main():
 
 	# Re_Mesh()
 
-def Update_Config(Config,Config_Data,Au,Al):
-#	print Config_Data['DEFINITION_DV']['PARAM'][0][0]
+def Update_Config(filename,Config,Au,Al,dvs):
+
+	Config.unpack_dvs(dvs)
+
 	j=0
 	k=0
 	for i in range(len(Au)*2):
-		if Config_Data['DEFINITION_DV']['PARAM'][i][0]==0:
-			Config_Data['DEFINITION_DV']['PARAM'][i][3]=Au[j]
-			Config_Data['DEFINITION_DV']['KIND'][i]="CST"
+		if Config['DEFINITION_DV']['PARAM'][i][0]==1:
+			Config['DEFINITION_DV']['PARAM'][i][1]=Au[j]
+			Config['DEFINITION_DV']['KIND'][i]="CST"
 			j+=1
 		else:
-			Config_Data['DEFINITION_DV']['PARAM'][i][3]=Al[k]
-			Config_Data['DEFINITION_DV']['KIND'][i]="CST"
+			Config['DEFINITION_DV']['PARAM'][i][1]=Al[k]
+			Config['DEFINITION_DV']['KIND'][i]="CST"
 			k+=1
-	SU2.io.config.write_config(Config,Config_Data)
+	#SU2.io.config.write_config(Config,Config_Data)
+	SU2.io.config.dump_config(filename,Config)
 	return
 
-def Read_Config(Config):
-	Config_Data=SU2.io.config.read_config(Config)
-	return Config_Data
+def Read_Config(filename):
+	Config=SU2.io.config.Config(filename)
+	#Config_Data=SU2.io.config.read_config(Config
+	return Config
 
-def Read_Mesh(Config_Data):
+def Read_Mesh(Config):
 
 	# Mesh Filename
-	Mesh=Config_Data['MESH_FILENAME']
-	marker=Config_Data['DEFINITION_DV']['MARKER'][0][0]
+	Mesh=Config['MESH_FILENAME']
+	marker=Config['DEFINITION_DV']['MARKER'][0][0]
 
 	# Using the Su2 python scripts for reading mesh
 	Meshdata=SU2.mesh.tools.read(Mesh) # read the mesh
@@ -241,6 +247,7 @@ def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
 
 	cst_upper=np.transpose(CST_Upper)
 	cst_lower=np.transpose(CST_Lower)
+
 
 	fig=plt.figure()
 	ax=fig.add_subplot(1,1,1)
