@@ -22,6 +22,7 @@ def main():
 	# Read Config 
 	Config=Read_Config(filename)
 	# Order determined by the number of design variables supplied
+	# Note that it's assumed that the order is identical for both surfaces
 	Order=int(0.5*len(Config['DEFINITION_DV']['PARAM'])-1)
 	# read coordinates
 	U_Coords,L_Coords=Read_Mesh(Config) # mesh/DAT filename
@@ -269,6 +270,10 @@ def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
 	filename='./Foils_Plot.png'
 	plt.savefig(filename,dpi=150)
 	plt.close()
+
+	# temp - print out coords to compare with DEF mesh 
+	Coords=np.append(U_Coords,L_Coords,axis=0)
+	np.savetxt("CST_Coords.dat",Coords)
 
 	return
 # this is only accessed if running from command prompt
