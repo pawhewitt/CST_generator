@@ -243,8 +243,11 @@ def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
 	u_coords=np.transpose(U_Coords)
 	l_coords=np.transpose(L_Coords)
 	
-	CST_Upper=CST(U_Coords,Al,n1,n2)
-	CST_Lower=CST(L_Coords,Au,n1,n2)
+	# Temp Code
+	Au[0]=Au[0]+0.3
+
+	CST_Upper=CST(U_Coords,Au,n1,n2)
+	CST_Lower=CST(L_Coords,Al,n1,n2)
 
 	cst_upper=np.transpose(CST_Upper)
 	cst_lower=np.transpose(CST_Lower)
@@ -272,7 +275,7 @@ def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
 	plt.close()
 
 	# temp - print out coords to compare with DEF mesh 
-	Coords=np.append(U_Coords,L_Coords,axis=0)
+	Coords=np.append(CST_Upper,CST_Lower,axis=0)
 	np.savetxt("CST_Coords.dat",Coords)
 
 	return

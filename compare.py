@@ -27,7 +27,6 @@ def main():
 	
 	CST=np.transpose(CST)
 	DEF=np.transpose(DEF)
-	print np.shape(DEF)
 	plt.plot(CST[0],CST[1])
 	plt.plot(DEF[0],DEF[1])
 
