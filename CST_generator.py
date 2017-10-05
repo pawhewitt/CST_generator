@@ -46,10 +46,7 @@ def main():
 	# the original foil for the RAE?
 
 	# # re-mesh geometry
-	# TODO
-	# Need to have CST added to C++ code for this
-
-	# Re_Mesh()
+	Re_Mesh(filename)
 
 def Update_Config(filename,Config,Au,Al,dvs):
 
@@ -233,10 +230,8 @@ def Write_File():
 	# Write a file containing the coefficients 
 	return
 
-def Re_Mesh(): # Mesh the geometry according to the CST approximation.
-	# for the SU2 option use the SU2_DEF code and for the dat file use the
-	# gmesh generator 
-	return 
+def Re_Mesh(filename): # Mesh the geometry according to the CST approximation.
+		os.system("SU2_DEF "+filename)
 
 def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
 
