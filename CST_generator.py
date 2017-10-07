@@ -26,11 +26,11 @@ def main():
 	Order=int(0.5*len(Config['DEFINITION_DV']['PARAM'])-1)
 	# read coordinates
 	U_Coords,L_Coords=Read_Mesh(Config) # mesh/DAT filename
-
+	
 	# compute the coefficients
 	Au,Al=Compute_Coeffs(U_Coords,L_Coords,Order,n1,n2)
 
-	dvs=np.zeros(len(Au)+len(Al))
+	dvs=[0.0]*(len(Au)+len(Al))
 
 	# # Update Config File
 
@@ -141,7 +141,6 @@ def Total_Shape(Coords,A):
 def Comp_Shape(Coords,Order):
 	# Component Shape function
 	K=Bi_Coeff(Order)
-	x=[]
 	# compute the Binomial Coefficient
 	S_c=np.zeros([Order+1,len(Coords)])
 
@@ -239,7 +238,8 @@ def Plot(U_Coords,L_Coords,Au,Al,n1,n2):
 	l_coords=np.transpose(L_Coords)
 	
 	# Temp Code
-	Au[0]=Au[0]+0.3
+	Al[0]=Al[0]-0.2
+	Al[2]=Al[2]-0.2
 
 	CST_Upper=CST(U_Coords,Au,n1,n2)
 	CST_Lower=CST(L_Coords,Al,n1,n2)
